@@ -135,10 +135,10 @@ EOF
               export PATH="$HOME/bin:$PATH"
               export KUBECONFIG="${KUBECONFIG_FILE}"
 
-              // ensure NAMESPACE exists
-              //kubectl get NAMESPACE ${NAMESPACE} >/dev/null 2>&1 || kubectl create NAMESPACE ${NAMESPACE}
+              # ensure NAMESPACE exists
+              #kubectl get NAMESPACE ${NAMESPACE} >/dev/null 2>&1 || kubectl create NAMESPACE ${NAMESPACE}
 
-              // apply the manifest from workspace
+              # apply the manifest from workspace
               kubectl apply -n ${NAMESPACE} -f ${WORKSPACE}/${MANIFEST_FILE}
             '''
           }
