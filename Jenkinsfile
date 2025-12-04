@@ -81,7 +81,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ${IMAGE_NAME}-deploy
-  NAMESPACE: ${NAMESPACE}
+  namespace: ${NAMESPACE}
   labels:
     app: ${IMAGE_NAME}-deploy
 spec:
@@ -99,28 +99,6 @@ spec:
           image: ${REGISTRY}
           ports:
             - containerPort: 80
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 5
-            periodSeconds: 5
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ${IMAGE_NAME}-svc
-  NAMESPACE: ${NAMESPACE}
-spec:
-  selector:
-    app: ${IMAGE_NAME}-deploy
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
-EOF
-            echo "Wrote manifest ${MANIFEST_FILE}:"
-            sed -n '1,200p' ${MANIFEST_FILE} || true
           """
         }
       }
