@@ -13,7 +13,7 @@ pipeline {
     //If using DinD sidecar, you may use DOCKER_HOST to point docker client to that daemon.
     DOCKER_HOST     = "tcp://dind:2375"
     DOCKER_TLS_VERIFY = "0"
-    KUBECTL_DOWNLOAD_URL = "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+   // KUBECTL_DOWNLOAD_URL = "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
   }
 
   options {
@@ -28,27 +28,30 @@ pipeline {
       }
     }
 
-    stage('Install kubectl using jnlp') {
-      steps {
-        // Install kubectl into $HOME/bin so it is available in later stages.
-        // Use container('jnlp') on pod templates; on a plain node it still runs in the node.
-        container('jnlp') {
-          sh '''
-            set -eux
-            mkdir -p "$HOME/bin"
-            cd "$HOME/bin"
-            // download kubectl to $HOME/bin
-            curl -fsSL ${KUBECTL_DOWNLOAD_URL} -o kubectl
-            chmod +x kubectl
-            // ensure $HOME/bin is available
-            echo "PATH before: $PATH"
-            export PATH="$HOME/bin:$PATH"
-            echo "PATH after: $PATH"
-            ./kubectl version --client --short || true
-          '''
-        }
-      }
+stage('Install kubectl using jnlp') {
+  steps {
+    container('jnlp') {
+      sh '''
+        set -eux
+
+        mkdir -p "$HOME/bin"
+
+        # Compute latest stable kubectl URL dynamically
+        RELEASE=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+        URL="https://dl.k8s.io/release/${RELEASE}/bin/linux/amd64/kubectl"
+
+        echo "Downloading kubectl from: $URL"
+
+        curl -LO "$URL"
+        chmod +x kubectl
+        mv kubectl "$HOME/bin/"
+
+        export PATH="$HOME/bin:$PATH"
+        kubectl version --client
+      '''
     }
+  }
+}
 
     stage('1 - Pull image from registry') {
       steps {
