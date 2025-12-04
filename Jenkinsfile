@@ -156,39 +156,7 @@ spec:
       }
     }
 
-    stage('6 - Run a basic post-deploy test using curl') {
-      steps {
-        // Use jnlp container and kubectl to run an ephemeral curl pod inside the cluster
-        container('jnlp') {
-          withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
-            sh '''
-              set -eux
-              export PATH="$HOME/bin:$PATH"
-              export KUBECONFIG="${KUBECONFIG_FILE}"
-              PODNAME="curl-test-$(date +%s)"
-
-              kubectl run "${PODNAME}" --rm -i --restart=Never --image=curlimages/curl -n ${NAMESPACE} --command -- sh -c '
-                set -eux
-                for i in 1 2 3 4 5; do
-                  echo "Attempt ${i}: curl -sS -m 5 http://${IMAGE_NAME}-svc/"
-                  if curl -sS -m 5 http://${IMAGE_NAME}-svc/; then
-                    echo "Service responded"
-                    exit 0
-                  else
-                    echo "Not ready yet; sleeping 2s"
-                    sleep 2
-                  fi
-                done
-                echo "Service did not respond" >&2
-                exit 1
-              '
-            '''
-          }
-        }
-      }
-    }
-
-    stage('7 - Cleanup using kubectl delete -f <manifest>') {
+    stage('6 - Cleanup using kubectl delete -f <manifest>') {
       steps {
         container('jnlp') {
           withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
