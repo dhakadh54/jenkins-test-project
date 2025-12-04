@@ -10,7 +10,7 @@ pipeline {
     KUBECONFIG_CRED = "kubeconfig-file-test-cluster"    // Jenkins Secret File ID
     NAMESPACE       = "test-ns"
 
-    //If using DinD sidecar, you may use env.DOCKER_HOST to point docker client to that daemon.
+    //If using DinD sidecar, you may use DOCKER_HOST to point docker client to that daemon.
     DOCKER_HOST     = "tcp://dind:2375"
     DOCKER_TLS_VERIFY = "0"
    // KUBECTL_DOWNLOAD_URL = "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -53,15 +53,22 @@ stage('Install kubectl using jnlp') {
   }
 }
 
-    stage('1 - Pull image from env.REGISTRY') {
-      steps {
-        // run docker pull in dind sidecar container
-        // note: the agent must have a 'dind' container in the pod template OR be a node with docker
-        container('dind') {
-          sh docker pull ${env.REGISTRY} 
-        }
-      }
+stage('1 - Pull image from registry') {
+  steps {
+    container('dind') {
+      sh '''
+        set -eux || true
+        # ensure DOCKER_HOST is available for docker client
+        echo "DOCKER_HOST=${DOCKER_HOST}"
+        if command -v docker >/dev/null 2>&1; then
+          docker pull ${REGISTRY} || true
+        else
+          echo "docker CLI not present in this container; cluster will pull image on pod creation"
+        fi
+      '''
     }
+  }
+}
 
     stage('2 - Generate manifest at runtime') {
       steps {
@@ -69,27 +76,27 @@ stage('Install kubectl using jnlp') {
         container('jnlp') {
           sh """
             set -eux
-            cat > ${env.MANIFEST_FILE} <<'EOF'
+            cat > ${MANIFEST_FILE} <<'EOF'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ${env.IMAGE_NAME}-deploy
-  env.NAMESPACE: ${env.NAMESPACE}
+  name: ${IMAGE_NAME}-deploy
+  NAMESPACE: ${NAMESPACE}
   labels:
-    app: ${env.IMAGE_NAME}-deploy
+    app: ${IMAGE_NAME}-deploy
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ${env.IMAGE_NAME}-deploy
+      app: ${IMAGE_NAME}-deploy
   template:
     metadata:
       labels:
-        app: ${env.IMAGE_NAME}-deploy
+        app: ${IMAGE_NAME}-deploy
     spec:
       containers:
-        - name: ${env.IMAGE_NAME}
-          image: ${env.REGISTRY}
+        - name: ${IMAGE_NAME}
+          image: ${REGISTRY}
           ports:
             - containerPort: 80
           readinessProbe:
@@ -102,18 +109,18 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ${env.IMAGE_NAME}-svc
-  env.NAMESPACE: ${env.NAMESPACE}
+  name: ${IMAGE_NAME}-svc
+  NAMESPACE: ${NAMESPACE}
 spec:
   selector:
-    app: ${env.IMAGE_NAME}-deploy
+    app: ${IMAGE_NAME}-deploy
   ports:
     - protocol: TCP
       port: 80
       targetPort: 80
 EOF
-            echo "Wrote manifest ${env.MANIFEST_FILE}:"
-            sed -n '1,200p' ${env.MANIFEST_FILE} || true
+            echo "Wrote manifest ${MANIFEST_FILE}:"
+            sed -n '1,200p' ${MANIFEST_FILE} || true
           """
         }
       }
@@ -122,17 +129,17 @@ EOF
     stage('3 - kubectl apply') {
       steps {
         container('jnlp') {
-          withCredentials([file(credentialsId: env.env.KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+          withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
             sh '''
               set -eux
               export PATH="$HOME/bin:$PATH"
               export KUBECONFIG="${KUBECONFIG_FILE}"
 
-              // ensure env.NAMESPACE exists
-              kubectl get env.NAMESPACE ${env.NAMESPACE} >/dev/null 2>&1 || kubectl create env.NAMESPACE ${env.NAMESPACE}
+              // ensure NAMESPACE exists
+              kubectl get NAMESPACE ${NAMESPACE} >/dev/null 2>&1 || kubectl create NAMESPACE ${NAMESPACE}
 
               // apply the manifest from workspace
-              kubectl apply -n ${env.NAMESPACE} -f ${WORKSPACE}/${env.MANIFEST_FILE}
+              kubectl apply -n ${NAMESPACE} -f ${WORKSPACE}/${MANIFEST_FILE}
             '''
           }
         }
@@ -142,13 +149,13 @@ EOF
     stage('4 - Rollout verification') {
       steps {
         container('jnlp') {
-          withCredentials([file(credentialsId: env.env.KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+          withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
             sh '''
               set -eux
               export PATH="$HOME/bin:$PATH"
               export KUBECONFIG="${KUBECONFIG_FILE}"
 
-              kubectl rollout status deployment/${env.IMAGE_NAME}-deploy -n ${env.NAMESPACE} --timeout=120s
+              kubectl rollout status deployment/${IMAGE_NAME}-deploy -n ${NAMESPACE} --timeout=120s
             '''
           }
         }
@@ -158,13 +165,13 @@ EOF
     stage('5 - Pod validation using kubectl get pods') {
       steps {
         container('jnlp') {
-          withCredentials([file(credentialsId: env.env.KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+          withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
             sh '''
               set -eux
               export PATH="$HOME/bin:$PATH"
               export KUBECONFIG="${KUBECONFIG_FILE}"
-              echo "Pods in env.NAMESPACE ${env.NAMESPACE}:"
-              kubectl get pods -n ${env.NAMESPACE} -o wide
+              echo "Pods in NAMESPACE ${NAMESPACE}:"
+              kubectl get pods -n ${NAMESPACE} -o wide
             '''
           }
         }
@@ -175,18 +182,18 @@ EOF
       steps {
         // Use jnlp container and kubectl to run an ephemeral curl pod inside the cluster
         container('jnlp') {
-          withCredentials([file(credentialsId: env.env.KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+          withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
             sh '''
               set -eux
               export PATH="$HOME/bin:$PATH"
               export KUBECONFIG="${KUBECONFIG_FILE}"
               PODNAME="curl-test-$(date +%s)"
 
-              kubectl run "${PODNAME}" --rm -i --restart=Never --image=curlimages/curl -n ${env.NAMESPACE} --command -- sh -c '
+              kubectl run "${PODNAME}" --rm -i --restart=Never --image=curlimages/curl -n ${NAMESPACE} --command -- sh -c '
                 set -eux
                 for i in 1 2 3 4 5; do
-                  echo "Attempt ${i}: curl -sS -m 5 http://${env.IMAGE_NAME}-svc/"
-                  if curl -sS -m 5 http://${env.IMAGE_NAME}-svc/; then
+                  echo "Attempt ${i}: curl -sS -m 5 http://${IMAGE_NAME}-svc/"
+                  if curl -sS -m 5 http://${IMAGE_NAME}-svc/; then
                     echo "Service responded"
                     exit 0
                   else
@@ -206,12 +213,12 @@ EOF
     stage('7 - Cleanup using kubectl delete -f <manifest>') {
       steps {
         container('jnlp') {
-          withCredentials([file(credentialsId: env.env.KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+          withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
             sh '''
               set -eux || true
               export PATH="$HOME/bin:$PATH"
               export KUBECONFIG="${KUBECONFIG_FILE}"
-              kubectl delete -n ${env.NAMESPACE} -f ${WORKSPACE}/${env.MANIFEST_FILE} --ignore-not-found=true || true
+              kubectl delete -n ${NAMESPACE} -f ${WORKSPACE}/${MANIFEST_FILE} --ignore-not-found=true || true
               echo "Cleanup completed."
             '''
           }
@@ -223,7 +230,7 @@ EOF
 
   post {
     always {
-      archiveArtifacts artifacts: "${env.MANIFEST_FILE}", fingerprint: true, allowEmptyArchive: true
+      archiveArtifacts artifacts: "${MANIFEST_FILE}", fingerprint: true, allowEmptyArchive: true
       echo 'Pipeline finished.'
     }
     failure {
