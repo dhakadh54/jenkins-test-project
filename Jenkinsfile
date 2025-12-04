@@ -10,7 +10,7 @@ pipeline {
     KUBECONFIG_CRED = "kubeconfig-file-test-cluster"    // Jenkins Secret File ID
     NAMESPACE       = "test-ns"
 
-    # If using DinD sidecar, you may use DOCKER_HOST to point docker client to that daemon.
+    //If using DinD sidecar, you may use DOCKER_HOST to point docker client to that daemon.
     DOCKER_HOST     = "tcp://dind:2375"
     DOCKER_TLS_VERIFY = "0"
     KUBECTL_DOWNLOAD_URL = "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -37,10 +37,10 @@ pipeline {
             set -eux
             mkdir -p "$HOME/bin"
             cd "$HOME/bin"
-            # download kubectl to $HOME/bin
+            // download kubectl to $HOME/bin
             curl -fsSL ${KUBECTL_DOWNLOAD_URL} -o kubectl
             chmod +x kubectl
-            # ensure $HOME/bin is available
+            // ensure $HOME/bin is available
             echo "PATH before: $PATH"
             export PATH="$HOME/bin:$PATH"
             echo "PATH after: $PATH"
@@ -57,7 +57,7 @@ pipeline {
         container('dind') {
           sh '''
             set -eux || true
-            # ensure DOCKER_HOST is available for docker client
+            // ensure DOCKER_HOST is available for docker client
             echo "DOCKER_HOST=${DOCKER_HOST}"
             if command -v docker >/dev/null 2>&1; then
               docker pull ${REGISTRY} || true
@@ -134,10 +134,10 @@ EOF
               export PATH="$HOME/bin:$PATH"
               export KUBECONFIG="${KUBECONFIG_FILE}"
 
-              # ensure namespace exists
+              // ensure namespace exists
               kubectl get namespace ${NAMESPACE} >/dev/null 2>&1 || kubectl create namespace ${NAMESPACE}
 
-              # apply the manifest from workspace
+              // apply the manifest from workspace
               kubectl apply -n ${NAMESPACE} -f ${WORKSPACE}/${MANIFEST_FILE}
             '''
           }
