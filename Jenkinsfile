@@ -58,16 +58,7 @@ stage('Install kubectl using jnlp') {
         // run docker pull in dind sidecar container
         // note: the agent must have a 'dind' container in the pod template OR be a node with docker
         container('dind') {
-          sh '''
-            set -eux || true
-            // ensure DOCKER_HOST is available for docker client
-            echo "DOCKER_HOST=${DOCKER_HOST}"
-            if command -v docker >/dev/null 2>&1; then
-              docker pull ${REGISTRY} || true
-            else
-              echo "docker CLI not present in this container — trying to run docker using container's entrypoint may fail"
-            fi
-          '''
+          sh docker pull ${REGISTRY} 
         }
       }
     }
