@@ -27,6 +27,7 @@ pipeline {
         checkout scm
       }
     }
+  }
 
 stage('Install kubectl using jnlp') {
   steps {
