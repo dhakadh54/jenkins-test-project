@@ -28,6 +28,30 @@ pipeline {
       }
     }
 
+stage('Install kubectl using jnlp') {
+  steps {
+    container('jnlp') {
+      sh '''
+        set -eux
+
+        mkdir -p "$HOME/bin"
+
+        # Compute latest stable kubectl URL dynamically
+        RELEASE=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+        URL="https://dl.k8s.io/release/${RELEASE}/bin/linux/amd64/kubectl"
+
+        echo "Downloading kubectl from: $URL"
+
+        curl -LO "$URL"
+        chmod +x kubectl
+        mv kubectl "$HOME/bin/"
+
+        export PATH="$HOME/bin:$PATH"
+        kubectl version --client
+      '''
+    }
+  }
+}
 
 stage('1 - Pull image from registry') {
   steps {
@@ -80,20 +104,25 @@ spec:
       }
     }
 
+    stage('3 - kubectl apply') {
+      steps {
+        container('jnlp') {
+          withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+            sh '''
+              set -eux
+              export PATH="$HOME/bin:$PATH"
+              export KUBECONFIG="${KUBECONFIG_FILE}"
 
-stage('3 - kubectl apply') {
-  steps {
-    container('kubectl') {
-      withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
-        sh '''
-          set -eux
-          export KUBECONFIG="${KUBECONFIG_FILE}"
-          kubectl apply -n ${NAMESPACE} -f ${WORKSPACE}/${MANIFEST_FILE}
-        '''
+              # ensure NAMESPACE exists
+              #kubectl get NAMESPACE ${NAMESPACE} >/dev/null 2>&1 || kubectl create NAMESPACE ${NAMESPACE}
+
+              # apply the manifest from workspace
+              kubectl apply -n ${NAMESPACE} -f ${WORKSPACE}/${MANIFEST_FILE}
+            '''
+          }
+        }
       }
     }
-  }
-}
 
     stage('4 - Rollout verification') {
       steps {
