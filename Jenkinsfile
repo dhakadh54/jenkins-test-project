@@ -24,19 +24,7 @@ pipeline {
                 checkout scm
             }
         }
-        stage('3 - kubectl apply') {
-            steps {
-                container('kubectl') {
-                    withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
-                        sh '''
-            set -eux
-            export KUBECONFIG="${KUBECONFIG_FILE}"
-            kubectl apply -n ${NAMESPACE} -f ${WORKSPACE}/${MANIFEST_FILE}
-          '''
-                    }
-                }
-            }
-        }
+
         stage('2 - Generate manifest at runtime') {
             steps {
                 // Use jnlp container to write manifest into workspace
