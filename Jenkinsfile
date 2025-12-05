@@ -24,7 +24,6 @@ pipeline {
                 checkout scm
             }
         }
-
         stage('2 - Generate manifest at runtime') {
             steps {
                 // Use jnlp container to write manifest into workspace
@@ -58,14 +57,15 @@ spec:
                 }
             }
         }
-        stage('3 - kubectl apply') {
+        stage('3 - kubectl apply (docker-run)') {
             steps {
-                container('kubectl') {
+                container('dind') {
                     withCredentials([file(credentialsId: KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
                         sh '''
           set -eux
-          export KUBECONFIG="${KUBECONFIG_FILE}"
-          kubectl apply -n ${NAMESPACE} -f ${WORKSPACE}/${MANIFEST_FILE}
+          # mount kubeconfig into the kubectl container
+          docker run --rm -v "${KUBECONFIG_FILE}:/root/.kube/config:ro" bitnami/kubectl:1.27.6 \
+            kubectl apply -n ${NAMESPACE} -f ${WORKSPACE}/${MANIFEST_FILE}
         '''
                     }
                 }
